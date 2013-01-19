@@ -1,6 +1,6 @@
 #
 # This Makefile producted by cm1r16
-# Last modified: 2013/01/05
+# Last modified: 2013/01/19
 #
 
 #SHELL = /bin/sh
@@ -12,8 +12,6 @@
 #   (also, make sure the paths to netcdf files are correct for your machine)
 #              (NOTE: Don't change lines 3 and 4!)
 #
-#OUTPUTINC = -I/usr/local/netcdf-3.6.3-intelxe/include
-#OUTPUTLIB = -L/usr/local/netcdf-3.6.3-intelxe/lib
 #NETCDF = /home/unuma/usr/local/netcdf-4.1.3
 #HDF5 = /home/unuma/usr/local/hdf5-1.8.7
 #ZLIB = /home/unuma/usr/local/zlib-1.2.5
@@ -34,9 +32,9 @@
 #LINKOPTS  = -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lsz -lz -lm
 #-----------------------------------------------------------------------------
 #                         STPK SECTION
-OUTPUTINC = -I/home/unuma/usr/local/unulibstpk/include
-OUTPUTLIB = -L/home/unuma/usr/local/unulibstpk/lib
-LINKOPTS  = -lstpk
+OUTPUTINC = -I/home/unuma/usr/local/unulibstpk/include -I/usr/local/netcdf-3.6.3-intelxe/include -I./
+OUTPUTLIB = -L/home/unuma/usr/local/unulibstpk/lib -L/usr/local/netcdf-3.6.3-intelxe/lib
+LINKOPTS  = -lstpk -lnetcdf
 #-----------------------------------------------------------------------------
 
 
@@ -52,7 +50,8 @@ LINKOPTS  = -lstpk
 #  Linux, single processor, Intel fortran compiler
 FC   = ifort
 #OPTS = -O0 -warn all -check all -traceback -FR -assume byterecl -fp-model precise -openmp -openmp-report1
-OPTS = -O3 -xSSE4.2 -fma -ipo -unroll0 -fno-alias -FR -assume byterecl -fp-model precise -openmp
+OPTS = -O3 -xSSE4.2 -fma -ip -unroll0 -fno-alias -FR -assume byterecl -fp-model precise -openmp
+#OPTS = -O3 -xSSE4.2 -fma -ipo -unroll0 -fno-alias -FR -assume byterecl -fp-model precise -openmp
 #-----------------------------------------------------------------------------
 #  Linux, single processor, using g95 compiler
 #FC   = g95
@@ -67,7 +66,11 @@ OPTS = -O3 -xSSE4.2 -fma -ipo -unroll0 -fno-alias -FR -assume byterecl -fp-model
 #-- You shouldn't need to change anything below here
 #-----------------------------------------------------------------------------
 
-SRC   = calc_index.f90    \
+SRC   = module_GMT35.f90  \
+	file_read2d.f90   \
+	file_read3d.f90   \
+	file_write2d.f90  \
+	calc_index.f90    \
 	calc_brn.f90      \
 	calc_helicity.f90 \
 	calc_press.f90    \
@@ -75,7 +78,8 @@ SRC   = calc_index.f90    \
 	calc_uvwnd.f90    \
 	calc_wdir.f90     \
 	calc_wspd.f90     \
-	calc_wsh.f90
+	calc_wsh.f90      \
+	undef2nan.f90
 
 OBJS = $(addsuffix .o, $(basename $(SRC)))
 

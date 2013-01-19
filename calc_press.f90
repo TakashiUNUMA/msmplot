@@ -1,6 +1,6 @@
 subroutine calc_press(pressp, pint)
   implicit none
-  integer :: k,kmax
+  integer :: k
   real, dimension(16) :: pressp,pint
 
   do k=1,16

@@ -1,17 +1,18 @@
 !
 ! Program of calcucate indexes for JMA-MSM
 ! produced by Takashi Unuma, Kyoto Univ.
-! Last modified: 2013/01/14
+! Last modified: 2013/01/19
 !
 
 program calc_index
 
-  use Thermo_Function
-  use Thermo_Advanced_Function
-  use Thermo_Advanced_Routine
+  USE Thermo_Function
+  USE Thermo_Advanced_Function
+  USE Thermo_Advanced_Routine
 
   implicit none
-  integer :: i, j, k, num
+
+  integer :: i, j, k
   integer, parameter :: nxs=481
   integer, parameter :: nys=505
   integer, parameter :: nxp=241
@@ -22,10 +23,10 @@ program calc_index
   real, dimension(:,:),   allocatable :: temp,rh,prmsl
   real, dimension(:,:),   allocatable :: press,es,qv,thetae,td
   real, dimension(:,:),   allocatable :: cape2d,cin2d,lcl2d,lfc2d,lnb2d
-  real, dimension(:,:),   allocatable :: cor,ki,tt,pw,eh,srh
+  real, dimension(:,:),   allocatable :: cor,ki,tt,pw,eh,srh,ehi
   real, dimension(:,:),   allocatable :: ltemp500,ssi,brn,wsh
   real, dimension(:,:,:), allocatable :: tempp,rhp,hgt,uuu,vvv,www
-  real, dimension(:,:,:), allocatable :: esp,qvp,thetaep,wspd
+  real, dimension(:,:,:), allocatable :: esp,qvp,thetaep,wspd,wdir
   real, dimension(:,:,:), allocatable :: ptp,rhop,pvp,tdp,qfu,qfv,qfwind
   integer,parameter :: debug_level=100
 
@@ -38,78 +39,33 @@ program calc_index
   allocate( uuu(nxp,nyp,nk1), vvv(nxp,nyp,nk1), www(nxp,nyp,nk1) )
   allocate( ptp(nxp,nyp,nk1), rhop(nxp,nyp,nk1), pvp(nxp,nyp,nk1) )
   allocate( tdp(nxp,nyp,nk1), ki(nxp,nyp), tt(nxp,nyp), pw(nxp,nyp), wsh(nxp,nyp) )
-  allocate( lcl2d(nxp,nyp), lfc2d(nxp,nyp), lnb2d(nxp,nyp), wspd(nxp,nyp,nk1) )
+  allocate( lcl2d(nxp,nyp), lfc2d(nxp,nyp), lnb2d(nxp,nyp) )
+  allocate( wspd(nxp,nyp,nk1), wdir(nxp,nyp,nk1), ehi(nxp,nyp) )
   allocate( cape2d(nxp,nyp), cin2d(nxp,nyp), cor(nxp,nyp), ssi(nxp,nyp) )
   allocate( eh(nxp,nyp), srh(nxp,nyp), ltemp500(nxp,nyp), brn(nxp,nyp) )
   allocate( qfu(nxp,nyp,nk1), qfv(nxp,nyp,nk1), qfwind(nxp,nyp,nk1) )
   if(debug_level.ge.100) print *, "DEBUG: Success allocate"
 
 
-
+  ! input files
   ! read temp [K] for surface
-  open(unit=10, file="temp.bin",form='unformatted',access='direct',status='old',recl=nxs*nys*4)
-  read(unit=10,rec=1) temp
-  close(unit=10)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of temp"
-  if(debug_level.ge.100) print *, "DEBUG: temp(1,1)    ",temp(1,1)
-
+  CALL file_read2d( "temp.bin",nxs,nys,temp(:,:) )
   ! read rh [%] for surface
-  open(unit=11, file="rh.bin",form='unformatted',access='direct',status='old',recl=nxs*nys*4)
-  read(unit=11,rec=1) rh
-  close(unit=11)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of rh"
-  if(debug_level.ge.100) print *, "DEBUG: rh(1,1)      ",rh(1,1)
-
+  CALL file_read2d( "rh.bin",nxs,nys,rh(:,:) )
   ! read prmsl [Pa] for surface
-  open(unit=12, file="prmsl.bin",form='unformatted',access='direct',status='old',recl=nxs*nys*4)
-  read(unit=12,rec=1) prmsl
-  close(unit=12)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of prmsl"
-  if(debug_level.ge.100) print *, "DEBUG: prmsl(1,1)   ",prmsl(1,1)
-
-
+  CALL file_read2d( "prmsl.bin",nxs,nys,prmsl(:,:) )
   ! read temp [K] for pressure
-  open(unit=13, file="ttt.bin",form='unformatted',access='direct',status='old',recl=nxp*nyp*nk1*4)
-  read(unit=13,rec=1) tempp
-  close(unit=13)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of tempp"
-  if(debug_level.ge.100) print *, "DEBUG: tempp(1,1,1) ",tempp(1,1,1)
-
+  CALL file_read3d( "ttt.bin",nxs,nys,nk1,tempp(:,:,:) )
   ! read rh [%] for pressure
-  open(unit=14, file="rhh.bin",form='unformatted',access='direct',status='old',recl=nxp*nyp*nk1*4)
-  read(unit=14,rec=1) rhp
-  close(unit=14)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of rhp"
-  if(debug_level.ge.100) print *, "DEBUG: rhp(1,1,1)   ",rhp(1,1,1)
-
+  CALL file_read3d( "rhh.bin",nxs,nys,nk2,rhp(:,:,:) )
   ! read hgt [m] for pressure
-  open(unit=15, file="hgt.bin",form='unformatted',access='direct',status='old',recl=nxp*nyp*nk1*4)
-  read(unit=15,rec=1) hgt
-  close(unit=15)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of hgt"
-  if(debug_level.ge.100) print *, "DEBUG: hgt(1,1,1)   ",hgt(1,1,1)
-
+  CALL file_read3d( "hgt.bin",nxs,nys,nk1,hgt(:,:,:) )
   ! read uuu [m/s] for pressure
-  open(unit=16, file="uuu.bin",form='unformatted',access='direct',status='old',recl=nxp*nyp*nk1*4)
-  read(unit=16,rec=1) uuu
-  close(unit=16)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of uuu"
-  if(debug_level.ge.100) print *, "DEBUG: uuu(1,1,1)   ",uuu(1,1,1)
-
+  CALL file_read3d( "uuu.bin",nxs,nys,nk1,uuu(:,:,:) )
   ! read vvv [m/s] for pressure
-  open(unit=17, file="vvv.bin",form='unformatted',access='direct',status='old',recl=nxp*nyp*nk1*4)
-  read(unit=17,rec=1) vvv
-  close(unit=17)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of vvv"
-  if(debug_level.ge.100) print *, "DEBUG: vvv(1,1,1)   ",vvv(1,1,1)
-
+  CALL file_read3d( "vvv.bin",nxs,nys,nk1,vvv(:,:,:) )
   ! read www [m/s] for pressure
-  open(unit=18, file="www.bin",form='unformatted',access='direct',status='old',recl=nxp*nyp*nk1*4)
-  read(unit=18,rec=1) www
-  close(unit=18)
-  if(debug_level.ge.100) print *, "DEBUG: Success open file of www"
-  if(debug_level.ge.100) print *, "DEBUG: www(1,1,1)   ",www(1,1,1)
-
+  CALL file_read3d( "www.bin",nxs,nys,nk1,www(:,:,:) )
 
 
   ! calculate indexes for surface
@@ -157,11 +113,12 @@ program calc_index
      end if
      qvp(i,j,k)=eP_2_qv( esp(i,j,k), pressp(k) )
      thetaep(i,j,k)=TqvP_2_thetae( tempp(i,j,k), qvp(i,j,k), pressp(k) )
-     wspd(i,j,k)=sqrt(uuu(i,j,k)**2+vvv(i,j,k)**2)
      rhop(i,j,k)=TP_2_rho( tempp(i,j,k), pressp(k) )
      ptp(i,j,k)=theta_dry( tempp(i,j,k), pressp(k) )
      tdp(i,j,k)=es_TD( esp(i,j,k) )
      call calc_qflux( pressp(k), qvp(i,j,k), uuu(i,j,k), vvv(i,j,k), qfu(i,j,k) ,qfv(i,j,k), qfwind(i,j,k) )
+     call calc_wspd(uuu(i,j,k),vvv(i,j,k),wspd(i,j,k))
+     call calc_wdir(uuu(i,j,k),vvv(i,j,k),wdir(i,j,k))
   end do
   end do
   end do
@@ -171,13 +128,14 @@ program calc_index
   if(debug_level.ge.100) print *, "DEBUG: esp(1,1,1)     ",esp(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: qvp(1,1,1)     ",qvp(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: thetaep(1,1,1) ",thetaep(1,1,1)
-  if(debug_level.ge.100) print *, "DEBUG: wspd(1,1,1)    ",wspd(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: rhop(1,1,1)    ",rhop(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: ptp(1,1,1)     ",ptp(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: tdp(1,1,1)     ",tdp(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: qfu(1,1,1)     ",qfu(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: qfv(1,1,1)     ",qfv(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: qfwind(1,1,1)  ",qfwind(1,1,1)
+  if(debug_level.ge.100) print *, "DEBUG: wspd(1,1,1)    ",wspd(1,1,1)
+  if(debug_level.ge.100) print *, "DEBUG: wdir(1,1,1)    ",wdir(1,1,1)
 
 
 !$omp parallel default(shared)
@@ -191,12 +149,13 @@ program calc_index
      lnb2d(i,j)=z_LNB( 500.,hgt(i,j,:),tempp(i,j,:),pressp(:),qvp(i,j,:),1,-999. )
      ki(i,j)=tempp(i,j,6)+tdp(i,j,6)+tdp(i,j,8)-tempp(i,j,8)-tempp(i,j,10)
      tt(i,j)=tempp(i,j,6)+tdp(i,j,6)-real(2.)*tempp(i,j,10)
-     pw(i,j)=precip_water( pressp(:), qvp(i,j,:) )
+     pw(i,j)=precip_water( pressp(:), qvp(i,j,:) )*real(1.020408)
      ltemp500(i,j)=moist_laps_temp( pressp(1), tempp(i,j,1), pressp(10) )
      ssi(i,j)=tempp(i,j,10)-ltemp500(i,j)
-     call calc_helicity( 1, 8, uuu(i,j,:), vvv(i,j,:), eh(i,j), srh(i,j) )
-     call calc_brn( 3, 11, uuu(i,j,:), vvv(i,j,:), cape2d(i,j), brn(i,j) )
-     call calc_wsh( 3, 11, uuu(i,j,:), vvv(i,j,:), wsh(i,j) )
+     CALL calc_helicity( 1, 8, uuu(i,j,:), vvv(i,j,:), eh(i,j), srh(i,j) )
+     ehi(i,j)=(cape2d(i,j)*srh(i,j))/real(160000.)
+     CALL calc_brn( 3, 11, uuu(i,j,:), vvv(i,j,:), cape2d(i,j), brn(i,j) )
+     CALL calc_wsh( 3, 11, uuu(i,j,:), vvv(i,j,:), wsh(i,j) )
      cor(i,j)=real(0.0001)
   end do
   end do
@@ -219,352 +178,211 @@ program calc_index
   if(debug_level.ge.100) print *, "DEBUG: pvp(1,1,1)     ",pvp(1,1,1)
 
 
+  ! make undef data
+!  CALL undef2nan()
 
+
+  ! output files
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- surface ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc  
   ! output press [hPa] for surface 2D
-  num=20
-  open(unit=num, file="press.bin",form='unformatted',access='direct',recl=nxs*nys*4)
-  write(unit=num,rec=1) press
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output press"
-
+  CALL file_write2d( "press.bin",nxs,nys,press(:,:) )
   ! output qv [g/kg] for surface 2D
-  open(unit=num, file="qv.bin",form='unformatted',access='direct',recl=nxs*nys*4)
-  write(unit=num,rec=1) qv*real(1000)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qv"
-
+  CALL file_write2d( "qv.bin",nxs,nys,qv(:,:)*real(1000.) )
   ! output thetae [K] for surface 2D
-  open(unit=num, file="thetae.bin",form='unformatted',access='direct',recl=nxs*nys*4)
-  write(unit=num,rec=1) thetae
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output thetae"
-
+  CALL file_write2d( "thetae.bin",nxs,nys,thetae(:,:) )
   ! output td [K] for surface 2D
-  open(unit=num, file="td.bin",form='unformatted',access='direct',recl=nxs*nys*4)
-  write(unit=num,rec=1) td
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output thetae"
-
+  CALL file_write2d( "td.bin",nxs,nys,td(:,:) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- diagnostic ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc  
   ! output cape2d [J/kg] for pressure 
-  open(unit=num, file="cape.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) cape2d
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output cape2d"
-
+  CALL file_write2d( "cape.bin",nxp,nyp,cape2d(:,:) )
   ! output cin2d [J/kg] for pressure 
-  open(unit=num, file="cin.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) real(-1.)*cin2d
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output cin2d"
-
+  CALL file_write2d( "cin.bin",nxp,nyp,real(-1.)*cin2d(:,:) )
   ! output lcl2d [m] for pressure 
-  open(unit=num, file="lcl.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) lcl2d
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output lcl2d"
-
+  CALL file_write2d( "lcl.bin",nxp,nyp,lcl2d(:,:) )
   ! output lfc2d [m] for pressure 
-  open(unit=num, file="lfc.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) lfc2d
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output lfc2d"
-
+  CALL file_write2d( "lfc.bin",nxp,nyp,lfc2d(:,:) )
   ! output lnb2d [m] for pressure 
-  open(unit=num, file="lnb.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) lnb2d
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output lnb2d"
-
+  CALL file_write2d( "lnb.bin",nxp,nyp,lnb2d(:,:) )
   ! output ki [C] for pressure
-  open(unit=num, file="ki.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) ki-real(273.15)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output ki.bin"
-
+  CALL file_write2d( "ki.bin",nxp,nyp,ki(:,:)-real(273.15) )
   ! output tt [K] for pressure
-  open(unit=num, file="tt.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) tt
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output tt.bin"
-
+  CALL file_write2d( "tt.bin",nxp,nyp,tt(:,:) )
   ! output pw [mm] for pressure
-  open(unit=num, file="pw.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) pw*real(1.020408)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output pw.bin"
-
+  CALL file_write2d( "pw.bin",nxp,nyp,pw(:,:) )
   ! output ehi [m^2/s^2*J/kg] for pressure
-  open(unit=num, file="ehi.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) (cape2d*srh)/real(160000)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output eh.bin"
-
+  CALL file_write2d( "ehi.bin",nxp,nyp,ehi(:,:) )
   ! output srh [m^2/s^2] for pressure
-  open(unit=num, file="srh.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) srh
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output srh.bin"
-
+  CALL file_write2d( "srh.bin",nxp,nyp,srh(:,:) )
   ! output brn [-] for pressure
-  open(unit=num, file="brn.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) brn
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output brn.bin"
-
+  CALL file_write2d( "brn.bin",nxp,nyp,brn(:,:) )
   ! output ssi [K] for pressure
-  open(unit=num, file="ssi.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) ssi
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output ssi.bin"
-
+  CALL file_write2d( "ssi.bin",nxp,nyp,ssi(:,:) )
   ! output wsh [m/s] for pressure
-  open(unit=num, file="wsh.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) wsh
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output wsh.bin"
-
+  CALL file_write2d( "wsh.bin",nxp,nyp,wsh(:,:) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 1000 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc  
   ! output qv1000 [g/kg] for pressure
-  open(unit=num, file="qv1000.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qvp(:,:,1)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qv1000"
-
+  CALL file_write2d( "qv1000.bin",nxp,nyp,qvp(:,:,1)*real(1000.) )
+  ! output u1000 [m/s] for pressure
+  CALL file_write2d( "u1000.bin",nxp,nyp,uuu(:,:,1) )
+  ! output v1000 [m/s] for pressure
+  CALL file_write2d( "v1000.bin",nxp,nyp,vvv(:,:,1) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 975 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! output qfwind975 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfwind975.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfwind(:,:,2)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfwind975"
-
+  CALL file_write2d( "qfwind975.bin",nxp,nyp,qfwind(:,:,2)*real(1000.) )
   ! output qfu975 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfu975.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfu(:,:,2)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfu975"
-
+  CALL file_write2d( "qfu975.bin",nxp,nyp,qfu(:,:,2)*real(1000.) )
   ! output qfv975 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfv975.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfv(:,:,2)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfv975"
-
+  CALL file_write2d( "qfv975.bin",nxp,nyp,qfv(:,:,2)*real(1000.) )
   ! output thetae975 [K] for pressure
-  open(unit=num, file="thetae975.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) thetaep(:,:,2)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output thetae975"
-
+  CALL file_write2d( "thetae975.bin",nxp,nyp,thetaep(:,:,2) )
   ! output qv975 [K] for pressure
-  open(unit=num, file="qv975.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qvp(:,:,2)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qv975"
-
+  CALL file_write2d( "qv975.bin",nxp,nyp,qvp(:,:,2)*real(1000.) )
+  ! output u975 [m/s] for pressure
+  CALL file_write2d( "u975.bin",nxp,nyp,uuu(:,:,2) )
+  ! output v975 [m/s] for pressure
+  CALL file_write2d( "v975.bin",nxp,nyp,vvv(:,:,2) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 950 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc  
   ! output qfwind950 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfwind950.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfwind(:,:,3)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfwind950"
-
+  CALL file_write2d( "qfwind950.bin",nxp,nyp,qfwind(:,:,3)*real(1000.) )
   ! output qfu950 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfu950.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfu(:,:,3)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfu950"
-
+  CALL file_write2d( "qfu950.bin",nxp,nyp,qfu(:,:,3)*real(1000.) )
   ! output qfv950 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfv950.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfv(:,:,3)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfv950"
-
+  CALL file_write2d( "qfv950.bin",nxp,nyp,qfv(:,:,3)*real(1000.) )
   ! output qv950 [g/kg] for pressure
-  open(unit=num, file="qv950.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qvp(:,:,3)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qv950"
-
+  CALL file_write2d( "qv950.bin",nxp,nyp,qvp(:,:,3)*real(1000.) )
   ! output pv950 [PVU] for pressure
-  open(unit=num, file="pv950.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) pvp(:,:,3)*real(0.01)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output pv950.bin"
-
+  CALL file_write2d( "pv950.bin",nxp,nyp,pvp(:,:,3)*real(0.01) )
   ! output thetae950 [K] for pressure
-  open(unit=num, file="thetae950.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) thetaep(:,:,3)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output thetae950"
-
+  CALL file_write2d( "thetae950.bin",nxp,nyp,thetaep(:,:,3) )
+  ! output u950 [m/s] for pressure
+  CALL file_write2d( "u950.bin",nxp,nyp,uuu(:,:,3) )
+  ! output v950 [m/s] for pressure
+  CALL file_write2d( "v950.bin",nxp,nyp,vvv(:,:,3) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 925 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! output qfwind925 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfwind925.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfwind(:,:,4)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfwind925"
-
+  CALL file_write2d( "qfwind925.bin",nxp,nyp,qfwind(:,:,4)*real(1000.) )
   ! output qfu925 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfu925.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfu(:,:,4)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfu925"
-
+  CALL file_write2d( "qfu925.bin",nxp,nyp,qfu(:,:,4)*real(1000.) )
   ! output qfv925 [g/(m^2*s^1)] for pressure
-  open(unit=num, file="qfv925.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qfv(:,:,4)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qfv925"
-
+  CALL file_write2d( "qfv925.bin",nxp,nyp,qfv(:,:,4)*real(1000.) )
   ! output qv925 [g/kg] for pressure
-  open(unit=num, file="qv925.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qvp(:,:,4)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qv925"
-
+  CALL file_write2d( "qv925.bin",nxp,nyp,qvp(:,:,4)*real(1000.) )
   ! output thetae925 [K] for pressure
-  open(unit=num, file="thetae925.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) thetaep(:,:,4)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output thetae925"
-
+  CALL file_write2d( "thetae925.bin",nxp,nyp,thetaep(:,:,4) )
+  ! output u925 [m/s] for pressure
+  CALL file_write2d( "u925.bin",nxp,nyp,uuu(:,:,4) )
+  ! output v925 [m/s] for pressure
+  CALL file_write2d( "v925.bin",nxp,nyp,vvv(:,:,4) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 850 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! output temp850 [C] for pressure
-  open(unit=num, file="temp850.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) tempp(:,:,6)-real(273.15)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output temp850"
-
+  CALL file_write2d( "temp850.bin",nxp,nyp,tempp(:,:,6)-real(273.15) )
   ! output qv850 [g/kg] for pressure
-  open(unit=num, file="qv850.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qvp(:,:,6)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qv850"
-
+  CALL file_write2d( "qv850.bin",nxp,nyp,qvp(:,:,6)*real(1000.) )
   ! output pv850 [PVU] for pressure
-  open(unit=num, file="pv850.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) pvp(:,:,6)*real(0.01)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output pv850.bin"
-
+  CALL file_write2d( "pv850.bin",nxp,nyp,pvp(:,:,6)*real(0.01) )
+  ! output u850 [m/s] for pressure
+  CALL file_write2d( "u850.bin",nxp,nyp,uuu(:,:,6) )
+  ! output v850 [m/s] for pressure
+  CALL file_write2d( "v850.bin",nxp,nyp,vvv(:,:,6) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 700 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! output temp700 [C] for pressure
-  open(unit=num, file="temp700.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) tempp(:,:,8)-real(273.15)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output temp700"
-
+  CALL file_write2d( "temp700.bin",nxp,nyp,tempp(:,:,8)-real(273.15) )
   ! output qv700 [g/kg] for pressure
-  open(unit=num, file="qv700.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) qvp(:,:,8)*real(1000.)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output qv700"
-
+  CALL file_write2d( "qv700.bin",nxp,nyp,qvp(:,:,8)*real(1000.) )
   ! output pv700 [PVU] for pressure
-  open(unit=num, file="pv700.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) pvp(:,:,8)*real(0.01)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output pv700.bin"
-
+  CALL file_write2d( "pv700.bin",nxp,nyp,pvp(:,:,8)*real(0.01) )
+  ! output u700 [m/s] for pressure
+  CALL file_write2d( "u700.bin",nxp,nyp,uuu(:,:,8) )
+  ! output v700 [m/s] for pressure
+  CALL file_write2d( "v700.bin",nxp,nyp,vvv(:,:,8) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 600 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! none
 
-
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 500 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! output hgt500 [m] for pressure
-  open(unit=num, file="hgt500.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) hgt(:,:,10)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output hgt500"
-
+  CALL file_write2d( "hgt500.bin",nxp,nyp,hgt(:,:,10) )
   ! output pv500 [PVU] for pressure
-  open(unit=num, file="pv500.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) pvp(:,:,10)*real(0.01)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output pv500.bin"
-
+  CALL file_write2d( "pv500.bin",nxp,nyp,pvp(:,:,10)*real(0.01) )
   ! output temp500 [C] for pressure
-  open(unit=num, file="temp500.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) tempp(:,:,10)-real(273.15)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output temp500"
-
+  CALL file_write2d( "temp500.bin",nxp,nyp,tempp(:,:,10)-real(273.15) )
   ! output wspd500 [gph] for pressure
-  open(unit=num, file="wspd500.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) wspd(:,:,10)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output wspd500"
-
+  CALL file_write2d( "wspd500.bin",nxp,nyp,wspd(:,:,10) )
+  ! output u500 [m/s] for pressure
+  CALL file_write2d( "u500.bin",nxp,nyp,uuu(:,:,10) )
+  ! output v500 [m/s] for pressure
+  CALL file_write2d( "v500.bin",nxp,nyp,vvv(:,:,10) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 300 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! output pv300 [PVU] for pressure
-  open(unit=num, file="pv300.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) pvp(:,:,12)*real(0.01)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output pv300.bin"
-
+  CALL file_write2d( "pv300.bin",nxp,nyp,pvp(:,:,12)*real(0.01) )
+  ! output u300 [m/s] for pressure
+  CALL file_write2d( "u300.bin",nxp,nyp,uuu(:,:,12) )
+  ! output v300 [m/s] for pressure
+  CALL file_write2d( "v300.bin",nxp,nyp,vvv(:,:,12) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 250 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! output wspd250 [m/s] for pressure
-  open(unit=num, file="wspd250.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) wspd(:,:,13)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output wspd250"
-
+  CALL file_write2d( "wspd250.bin",nxp,nyp,wspd(:,:,13) )
+  ! output u250 [m/s] for pressure
+  CALL file_write2d( "u250.bin",nxp,nyp,uuu(:,:,13) )
+  ! output v250 [m/s] for pressure
+  CALL file_write2d( "v250.bin",nxp,nyp,vvv(:,:,13) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 200 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! output pv200 [PVU] for pressure
-  open(unit=num, file="pv200.bin",form='unformatted',access='direct',recl=nxp*nyp*4)
-  write(unit=num,rec=1) pvp(:,:,14)*real(0.01)
-  close(unit=num)
-  if(debug_level.ge.100) print *, "DEBUG: Success output pv200.bin"
+  CALL file_write2d( "pv200.bin",nxp,nyp,pvp(:,:,14)*real(0.01) )
+  ! output u200 [m/s] for pressure
+  CALL file_write2d( "u200.bin",nxp,nyp,uuu(:,:,14) )
+  ! output v200 [m/s] for pressure
+  CALL file_write2d( "v200.bin",nxp,nyp,vvv(:,:,14) )
+
+!  status = grd_create( 'testpv200.grd', pvp(:,:,14)*real(0.01), (/120d0,150d0/), (/22.4d0,47.6d0/), &
+!       & (/0.125d0,0.05d0/), NaN=-999., jscan=1 )
+!  if(status.ge.1) print *, "DEBUG: Success output testpv200"
 
 
   deallocate( temp,rh,prmsl,press,es,qv,thetae,td,pint )
   deallocate( tempp,rhp,hgt,pressp,x,y,z,esp,qvp,thetaep )
   deallocate( uuu,vvv,www,wspd,ptp,rhop,pvp,tdp,ki,tt,pw )
-  deallocate( lcl2d,lfc2d,lnb2d,cape2d,cin2d,cor,eh,srh )
-  deallocate( ssi,ltemp500,brn,qfu,qfv,qfwind,wsh )
+  deallocate( lcl2d,lfc2d,lnb2d,cape2d,cin2d,cor,eh,srh,ehi )
+  deallocate( ssi,ltemp500,brn,qfu,qfv,qfwind,wsh,wdir )
   if(debug_level.ge.100) print *, "DEBUG: Success deallocate all the values"
 
-  if(debug_level.ge.100) print *, "DEBUG: Everything cool !!!"
+  if(debug_level.ge.100) print *, "DEBUG: Everything is cool !!!"
 
   stop
 end program calc_index
