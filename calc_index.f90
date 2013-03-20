@@ -1,11 +1,12 @@
 !
 ! Program of calcucate indexes for JMA-MSM
 ! produced by Takashi Unuma, Kyoto Univ.
-! Last modified: 2013/01/19
+! Last modified: 2013/03/20
 !
 
 program calc_index
 
+  USE Derivation
   USE Thermo_Function
   USE Thermo_Advanced_Function
   USE Thermo_Advanced_Routine
@@ -27,7 +28,7 @@ program calc_index
   real, dimension(:,:),   allocatable :: ltemp500,ssi,brn,wsh
   real, dimension(:,:,:), allocatable :: tempp,rhp,hgt,uuu,vvv,www
   real, dimension(:,:,:), allocatable :: esp,qvp,thetaep,wspd,wdir
-  real, dimension(:,:,:), allocatable :: ptp,rhop,pvp,tdp,qfu,qfv,qfwind
+  real, dimension(:,:,:), allocatable :: ptp,rhop,pvp,tdp,qfu,qfv,qfwind,qfdiv
   integer,parameter :: debug_level=100
 
   ! allocate values
@@ -43,7 +44,7 @@ program calc_index
   allocate( wspd(nxp,nyp,nk1), wdir(nxp,nyp,nk1), ehi(nxp,nyp) )
   allocate( cape2d(nxp,nyp), cin2d(nxp,nyp), cor(nxp,nyp), ssi(nxp,nyp) )
   allocate( eh(nxp,nyp), srh(nxp,nyp), ltemp500(nxp,nyp), brn(nxp,nyp) )
-  allocate( qfu(nxp,nyp,nk1), qfv(nxp,nyp,nk1), qfwind(nxp,nyp,nk1) )
+  allocate( qfu(nxp,nyp,nk1), qfv(nxp,nyp,nk1), qfwind(nxp,nyp,nk1), qfdiv(nxp,nyp,nk1) )
   if(debug_level.ge.100) print *, "DEBUG: Success allocate"
 
 
@@ -117,10 +118,11 @@ program calc_index
      ptp(i,j,k)=theta_dry( tempp(i,j,k), pressp(k) )
      tdp(i,j,k)=es_TD( esp(i,j,k) )
      call calc_qflux( pressp(k), qvp(i,j,k), uuu(i,j,k), vvv(i,j,k), qfu(i,j,k) ,qfv(i,j,k), qfwind(i,j,k) )
-     call calc_wspd(uuu(i,j,k),vvv(i,j,k),wspd(i,j,k))
-     call calc_wdir(uuu(i,j,k),vvv(i,j,k),wdir(i,j,k))
+     call calc_wspd( uuu(i,j,k), vvv(i,j,k), wspd(i,j,k) )
+     call calc_wdir( uuu(i,j,k), vvv(i,j,k), wdir(i,j,k) )
   end do
   end do
+  call div( x, y, qfu(:,:,k), qfv(:,:,k), qfdiv(:,:,k) )
   end do
 !$omp end do
 !$omp end parallel
@@ -134,6 +136,7 @@ program calc_index
   if(debug_level.ge.100) print *, "DEBUG: qfu(1,1,1)     ",qfu(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: qfv(1,1,1)     ",qfv(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: qfwind(1,1,1)  ",qfwind(1,1,1)
+  if(debug_level.ge.100) print *, "DEBUG: qfdiv(1,1,1)   ",qfdiv(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: wspd(1,1,1)    ",wspd(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: wdir(1,1,1)    ",wdir(1,1,1)
 
@@ -176,7 +179,6 @@ program calc_index
   if(debug_level.ge.100) print *, "DEBUG: brn(1,1)       ",brn(1,1)
   if(debug_level.ge.100) print *, "DEBUG: wsh(1,1)       ",wsh(1,1)
   if(debug_level.ge.100) print *, "DEBUG: pvp(1,1,1)     ",pvp(1,1,1)
-
 
   ! make undef data
 !  CALL undef2nan()
@@ -238,15 +240,17 @@ program calc_index
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 975 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
-  ! output qfwind975 [g/(m^2*s^1)] for pressure
+  ! output qfwind975 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfwind975.bin",nxp,nyp,qfwind(:,:,2)*real(1000.) )
-  ! output qfu975 [g/(m^2*s^1)] for pressure
+  ! output qfu975 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfu975.bin",nxp,nyp,qfu(:,:,2)*real(1000.) )
-  ! output qfv975 [g/(m^2*s^1)] for pressure
+  ! output qfv975 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfv975.bin",nxp,nyp,qfv(:,:,2)*real(1000.) )
+  ! output qfdiv975 [g/(m*s)] for pressure
+  CALL file_write2d( "qfdiv975.bin",nxp,nyp,qfdiv(:,:,2)*real(1000.) )
   ! output thetae975 [K] for pressure
   CALL file_write2d( "thetae975.bin",nxp,nyp,thetaep(:,:,2) )
-  ! output qv975 [K] for pressure
+  ! output qv975 [g/kg] for pressure
   CALL file_write2d( "qv975.bin",nxp,nyp,qvp(:,:,2)*real(1000.) )
   ! output u975 [m/s] for pressure
   CALL file_write2d( "u975.bin",nxp,nyp,uuu(:,:,2) )
@@ -256,12 +260,14 @@ program calc_index
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 950 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc  
-  ! output qfwind950 [g/(m^2*s^1)] for pressure
+  ! output qfwind950 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfwind950.bin",nxp,nyp,qfwind(:,:,3)*real(1000.) )
-  ! output qfu950 [g/(m^2*s^1)] for pressure
+  ! output qfu950 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfu950.bin",nxp,nyp,qfu(:,:,3)*real(1000.) )
-  ! output qfv950 [g/(m^2*s^1)] for pressure
+  ! output qfv950 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfv950.bin",nxp,nyp,qfv(:,:,3)*real(1000.) )
+  ! output qfdiv950 [g/(m*s)] for pressure
+  CALL file_write2d( "qfdiv950.bin",nxp,nyp,qfdiv(:,:,3)*real(1000.) )
   ! output qv950 [g/kg] for pressure
   CALL file_write2d( "qv950.bin",nxp,nyp,qvp(:,:,3)*real(1000.) )
   ! output pv950 [PVU] for pressure
@@ -276,12 +282,14 @@ program calc_index
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 925 hPa ---
   !ccccccccccccccccccccccccccccccccccccccccccccccc
-  ! output qfwind925 [g/(m^2*s^1)] for pressure
+  ! output qfwind925 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfwind925.bin",nxp,nyp,qfwind(:,:,4)*real(1000.) )
-  ! output qfu925 [g/(m^2*s^1)] for pressure
+  ! output qfu925 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfu925.bin",nxp,nyp,qfu(:,:,4)*real(1000.) )
-  ! output qfv925 [g/(m^2*s^1)] for pressure
+  ! output qfv925 [g/(m^2*s)] for pressure
   CALL file_write2d( "qfv925.bin",nxp,nyp,qfv(:,:,4)*real(1000.) )
+  ! output qfdiv925 [g/(m*s)] for pressure
+  CALL file_write2d( "qfdiv925.bin",nxp,nyp,qfdiv(:,:,4)*real(1000.) )
   ! output qv925 [g/kg] for pressure
   CALL file_write2d( "qv925.bin",nxp,nyp,qvp(:,:,4)*real(1000.) )
   ! output thetae925 [K] for pressure
@@ -379,7 +387,7 @@ program calc_index
   deallocate( tempp,rhp,hgt,pressp,x,y,z,esp,qvp,thetaep )
   deallocate( uuu,vvv,www,wspd,ptp,rhop,pvp,tdp,ki,tt,pw )
   deallocate( lcl2d,lfc2d,lnb2d,cape2d,cin2d,cor,eh,srh,ehi )
-  deallocate( ssi,ltemp500,brn,qfu,qfv,qfwind,wsh,wdir )
+  deallocate( ssi,ltemp500,brn,qfu,qfv,qfwind,qfdiv,wsh,wdir )
   if(debug_level.ge.100) print *, "DEBUG: Success deallocate all the values"
 
   if(debug_level.ge.100) print *, "DEBUG: Everything is cool !!!"
