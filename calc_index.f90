@@ -1,7 +1,7 @@
 !
 ! Program of calcucate indexes for JMA-MSM
 ! produced by Takashi Unuma, Kyoto Univ.
-! Last modified: 2013/07/04
+! Last modified: 2013/07/05
 !
 
 program calc_index
@@ -232,6 +232,10 @@ program calc_index
   CALL file_write2d( "wsh.bin",nxp,nyp,wsh(:,:) )
   ! output lsta [K] (thetae_925hPa-thetaes_500hPa): Latent Stability
   CALL file_write2d( "lsta.bin",nxp,nyp,thetaep(:,:,4)-thetaesp(:,:,10) )
+  ! output dlfc [m] (lfc-lcl)
+  CALL file_write2d( "dlfc.bin",nxp,nyp,lfc2d(:,:)-lcl2d(:,:) )
+  ! output dlnb [m] (lnb-lfc)
+  CALL file_write2d( "dlnb.bin",nxp,nyp,lnb2d(:,:)-lfc2d(:,:) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 1000 hPa ---
