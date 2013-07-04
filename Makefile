@@ -1,6 +1,6 @@
 #
 # This Makefile producted by cm1r16
-# Last modified: 2013/03/20
+# Last modified: 2013/07/04
 #
 
 #SHELL = /bin/sh
@@ -34,6 +34,8 @@
 #                         STPK SECTION
 OUTPUTINC = -I/home/unuma/usr/local/unulibstpk/include -I/usr/local/netcdf-3.6.3-intelxe/include -I./
 OUTPUTLIB = -L/home/unuma/usr/local/unulibstpk/lib -L/usr/local/netcdf-3.6.3-intelxe/lib
+#OUTPUTINC = -I/home/unuma/usr/local/libstpk_0.9.8.0-gnu/include -I/usr/local/netcdf-3.6.3-gnu/include -I./
+#OUTPUTLIB = -L/home/unuma/usr/local/libstpk_0.9.8.0-gnu/lib -L/usr/local/netcdf-3.6.3-gnu/lib
 LINKOPTS  = -lstpk -lnetcdf
 #-----------------------------------------------------------------------------
 
@@ -50,7 +52,7 @@ LINKOPTS  = -lstpk -lnetcdf
 #  Linux, single processor, Intel fortran compiler
 FC   = ifort
 #OPTS = -O0 -warn all -check all -traceback -FR -assume byterecl -fp-model precise -openmp -openmp-report1
-OPTS = -O3 -xSSE4.2 -fma -ip -unroll0 -fno-alias -FR -assume byterecl -openmp
+OPTS = -O3 -xSSE4.2 -fma -ipo -unroll0 -fno-alias -FR -assume byterecl -openmp
 #OPTS = -O3 -xSSE4.2 -fma -ipo -unroll0 -fno-alias -FR -assume byterecl -fp-model precise -openmp
 #-----------------------------------------------------------------------------
 #  Linux, single processor, using g95 compiler
@@ -58,16 +60,16 @@ OPTS = -O3 -xSSE4.2 -fma -ip -unroll0 -fno-alias -FR -assume byterecl -openmp
 #OPTS = -ffree-form -O2
 #-----------------------------------------------------------------------------
 #  Linux, single processor, using gfortran compiler
-#FC   = gfortran
-#OPTS = -ffree-form -O2
+#FC     = gfortran44
+#OPTS = -frecord-marker=4 -ffree-form -O3 -ftree-vectorize -funroll-loops -fno-range-check
+#OPTS = -frecord-marker=4 -ffree-form -O0 -Wall -Wuninitialized -ffpe-trap=invalid,zero,overflow -fbounds-check -fno-range-check -fopenmp
 #-----------------------------------------------------------------------------
 #CPP  = cpp -C -P -traditional
 #-----------------------------------------------------------------------------
 #-- You shouldn't need to change anything below here
 #-----------------------------------------------------------------------------
 
-SRC   = module_GMT35.f90  \
-	file_read2d.f90   \
+SRC   = file_read2d.f90   \
 	file_read3d.f90   \
 	file_write2d.f90  \
 	calc_index.f90    \

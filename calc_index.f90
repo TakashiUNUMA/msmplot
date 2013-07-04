@@ -1,7 +1,7 @@
 !
 ! Program of calcucate indexes for JMA-MSM
 ! produced by Takashi Unuma, Kyoto Univ.
-! Last modified: 2013/03/20
+! Last modified: 2013/07/04
 !
 
 program calc_index
@@ -27,7 +27,7 @@ program calc_index
   real, dimension(:,:),   allocatable :: cor,ki,tt,pw,eh,srh,ehi
   real, dimension(:,:),   allocatable :: ltemp500,ssi,brn,wsh
   real, dimension(:,:,:), allocatable :: tempp,rhp,hgt,uuu,vvv,www
-  real, dimension(:,:,:), allocatable :: esp,qvp,thetaep,wspd,wdir
+  real, dimension(:,:,:), allocatable :: esp,qvp,thetaep,thetaesp,wspd,wdir
   real, dimension(:,:,:), allocatable :: ptp,rhop,pvp,tdp,qfu,qfv,qfwind,qfdiv
   integer,parameter :: debug_level=100
 
@@ -36,7 +36,7 @@ program calc_index
   allocate( temp(nxs,nys), rh(nxs,nys), prmsl(nxs,nys), press(nxs,nys) )
   allocate( es(nxs,nys), qv(nxs,nys), thetae(nxs,nys), td(nxs,nys) )
   allocate( tempp(nxp,nyp,nk1), rhp(nxp,nyp,nk2), hgt(nxp,nyp,nk1) )
-  allocate( esp(nxp,nyp,nk1), qvp(nxp,nyp,nk1), thetaep(nxp,nyp,nk1) )
+  allocate( esp(nxp,nyp,nk1), qvp(nxp,nyp,nk1), thetaep(nxp,nyp,nk1), thetaesp(nxp,nyp,nk1) )
   allocate( uuu(nxp,nyp,nk1), vvv(nxp,nyp,nk1), www(nxp,nyp,nk1) )
   allocate( ptp(nxp,nyp,nk1), rhop(nxp,nyp,nk1), pvp(nxp,nyp,nk1) )
   allocate( tdp(nxp,nyp,nk1), ki(nxp,nyp), tt(nxp,nyp), pw(nxp,nyp), wsh(nxp,nyp) )
@@ -45,7 +45,7 @@ program calc_index
   allocate( cape2d(nxp,nyp), cin2d(nxp,nyp), cor(nxp,nyp), ssi(nxp,nyp) )
   allocate( eh(nxp,nyp), srh(nxp,nyp), ltemp500(nxp,nyp), brn(nxp,nyp) )
   allocate( qfu(nxp,nyp,nk1), qfv(nxp,nyp,nk1), qfwind(nxp,nyp,nk1), qfdiv(nxp,nyp,nk1) )
-  if(debug_level.ge.100) print *, "DEBUG: Success allocate"
+  if(debug_level.ge.100) print *, "DEBUG: Success allocate value arrays"
 
 
   ! input files
@@ -77,7 +77,8 @@ program calc_index
      press(i,j)=prmsl(i,j)*real(0.01)
      es(i,j)=RHT_2_e( rh(i,j), temp(i,j) )
      qv(i,j)=eP_2_qv( es(i,j), prmsl(i,j) )
-     thetae(i,j)=TqvP_2_thetae( temp(i,j), qv(i,j), prmsl(i,j) )
+!     thetae(i,j)=TqvP_2_thetae( temp(i,j), qv(i,j), prmsl(i,j) ) ! modified: 2013/07/04
+     thetae(i,j)=thetae_Bolton( temp(i,j), qv(i,j), prmsl(i,j) )
      td(i,j)=es_TD(es(i,j))
   end do
   end do
@@ -113,7 +114,9 @@ program calc_index
         esp(i,j,k)=RHT_2_e( rhp(i,j,k), tempp(i,j,k) )
      end if
      qvp(i,j,k)=eP_2_qv( esp(i,j,k), pressp(k) )
-     thetaep(i,j,k)=TqvP_2_thetae( tempp(i,j,k), qvp(i,j,k), pressp(k) )
+!     thetaep(i,j,k)=TqvP_2_thetae( tempp(i,j,k), qvp(i,j,k), pressp(k) ) ! modified: 2013/07/04
+     thetaep(i,j,k)=thetae_Bolton( tempp(i,j,k), qvp(i,j,k), pressp(k) )
+     thetaesp(i,j,k)=thetaes_Bolton( tempp(i,j,k), pressp(k) )
      rhop(i,j,k)=TP_2_rho( tempp(i,j,k), pressp(k) )
      ptp(i,j,k)=theta_dry( tempp(i,j,k), pressp(k) )
      tdp(i,j,k)=es_TD( esp(i,j,k) )
@@ -130,6 +133,7 @@ program calc_index
   if(debug_level.ge.100) print *, "DEBUG: esp(1,1,1)     ",esp(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: qvp(1,1,1)     ",qvp(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: thetaep(1,1,1) ",thetaep(1,1,1)
+  if(debug_level.ge.100) print *, "DEBUG: thetaesp(1,1,1)",thetaesp(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: rhop(1,1,1)    ",rhop(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: ptp(1,1,1)     ",ptp(1,1,1)
   if(debug_level.ge.100) print *, "DEBUG: tdp(1,1,1)     ",tdp(1,1,1)
@@ -226,6 +230,8 @@ program calc_index
   CALL file_write2d( "ssi.bin",nxp,nyp,ssi(:,:) )
   ! output wsh [m/s] for pressure
   CALL file_write2d( "wsh.bin",nxp,nyp,wsh(:,:) )
+  ! output lsta [K] (thetae_925hPa-thetaes_500hPa): Latent Stability
+  CALL file_write2d( "lsta.bin",nxp,nyp,thetaep(:,:,4)-thetaesp(:,:,10) )
 
   !ccccccccccccccccccccccccccccccccccccccccccccccc
   ! --- 1000 hPa ---
@@ -384,7 +390,7 @@ program calc_index
 
 
   deallocate( temp,rh,prmsl,press,es,qv,thetae,td,pint )
-  deallocate( tempp,rhp,hgt,pressp,x,y,z,esp,qvp,thetaep )
+  deallocate( tempp,rhp,hgt,pressp,x,y,z,esp,qvp,thetaep,thetaesp )
   deallocate( uuu,vvv,www,wspd,ptp,rhop,pvp,tdp,ki,tt,pw )
   deallocate( lcl2d,lfc2d,lnb2d,cape2d,cin2d,cor,eh,srh,ehi )
   deallocate( ssi,ltemp500,brn,qfu,qfv,qfwind,qfdiv,wsh,wdir )
